@@ -1,17 +1,20 @@
+// app/page.tsx
 "use client";
 import { useState, useEffect } from "react";
 import Papa from "papaparse";
+import SensorCard from "../components/SensorCard";
+import { formatSensorValue, formatLabel } from "../utils/formatter";
 
 export default function Dashboard() {
-  // Tambahan <any[]> agar TS tidak menganggap data selamanya kosong ('never')
   const [csvData, setCsvData] = useState<any[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [status, setStatus] = useState({ kode: 0, pesan: "Menunggu aliran data..." });
-  // Tambahan <any> untuk menampung baris sensor
+  const [status, setStatus] = useState({ kode: 0, pesan: "Menunggu sistem..." });
   const [sensor, setSensor] = useState<any>(null);
+  
+  // State Tema
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
-  // Menambahkan tipe 'React.ChangeEvent' pada parameter (e)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -20,13 +23,11 @@ export default function Dashboard() {
       header: true,
       dynamicTyping: true,
       skipEmptyLines: true,
-      // Menambahkan tipe 'any' pada results
       complete: (results: any) => setCsvData(results.data),
     });
   };
 
   useEffect(() => {
-    // Mendeklarasikan tipe khusus untuk interval waktu
     let interval: NodeJS.Timeout;
 
     if (isRunning && currentIndex < csvData.length) {
@@ -51,7 +52,7 @@ export default function Dashboard() {
           const data = await res.json();
           setStatus({ kode: data.status_kode, pesan: data.pesan });
         } catch (err) {
-          console.error("Gagal terhubung ke Backend", err);
+          console.error("Koneksi gagal", err);
         }
         
         setCurrentIndex((prev) => prev + 1);
@@ -64,33 +65,109 @@ export default function Dashboard() {
   }, [isRunning, currentIndex, csvData]);
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-8 font-sans">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <h1 className="text-3xl font-bold border-b border-gray-700 pb-4 text-center">HMI Pemantauan Mesin Real-Time</h1>
+    <div className={`min-h-screen p-4 md:p-8 font-sans transition-colors duration-500 selection:bg-blue-500/30 
+      ${isDarkMode ? 'bg-[#0B1120] text-slate-200' : 'bg-slate-50 text-slate-800'}`}>
+      <div className="max-w-4xl mx-auto space-y-6 md:space-y-8">
         
-        <div className="bg-gray-800 p-6 rounded-lg shadow-lg flex items-center justify-between">
-          <input type="file" accept=".csv" onChange={handleFileUpload} className="text-sm" />
-          <button 
-            onClick={() => setIsRunning(!isRunning)}
-            disabled={csvData.length === 0}
-            className={`px-6 py-2 rounded font-bold ${isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'} disabled:opacity-50`}
-          >
-            {isRunning ? "Hentikan Simulasi" : "Mulai Simulasi"}
-          </button>
-        </div>
+        {/* Header Panel */}
+        <header className={`flex flex-col md:flex-row justify-between items-start md:items-center border-b pb-4 md:pb-6 gap-6 ${isDarkMode ? 'border-slate-800' : 'border-slate-300'}`}>
+          
+          {/* Diubah menjadi text-left agar rapi dengan tombol di kanan */}
+          <div className="w-full md:w-auto text-left">
+            <h1 className={`text-xl md:text-3xl font-semibold tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+              Industrial IIoT Dashboard
+            </h1>
+            <p className={`text-sm md:text-base mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+              Real-time CNC Machine Monitoring
+            </p>
+          </div>
+          
+          {/* justify-center diubah menjadi justify-end agar tombol rata kanan di mobile */}
+          <div className="flex items-center justify-end gap-4 w-full md:w-auto">
+            
+            {/* Tombol Tema (SVG) */}
+            <button 
+              onClick={() => setIsDarkMode(!isDarkMode)} 
+              className={`p-2 rounded-full transition-all hover:scale-110 active:scale-95 ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-200'}`}
+              title={isDarkMode ? "Ganti ke Mode Terang" : "Ganti ke Mode Gelap"}
+            >
+              {isDarkMode ? (
+                <svg className="w-6 h-6 text-shadow-slate-50" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                </svg>
+              ) : (
+                <svg className="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+                </svg>
+              )}
+            </button>
 
-        <div className={`p-8 rounded-lg shadow-lg text-center transition-colors duration-500 ${status.kode === 1 ? 'bg-red-600 animate-pulse' : 'bg-green-600'}`}>
-          <h2 className="text-2xl font-bold">STATUS MESIN</h2>
-          <p className="text-4xl mt-2 font-black tracking-wider">{status.pesan.toUpperCase()}</p>
-        </div>
-
-        {sensor && (
-          <div className="grid grid-cols-3 gap-4">
-            {Object.entries(sensor).map(([key, val]) => (
-              <div key={key} className="bg-gray-800 p-4 rounded text-center border border-gray-700">
-                <p className="text-xs text-gray-400 uppercase">{key}</p>
-                <p className="text-xl font-mono mt-1">{String(val)}</p>
+            {/* HARDWARE CONTROL PANEL */}
+            <div className="flex items-center gap-3 py-3 rounded-lg md:w-auto">
+              
+              {/* Indikator Hijau (Load CSV) */}
+              <div className="flex items-center gap-3">
+                <label 
+                  htmlFor="csv-upload" 
+                  className="w-6 h-6 rounded-full bg-emerald-500 hover:bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.5)] cursor-pointer transition-all active:scale-90"
+                  title=""
+                ></label>
+                <input 
+                  id="csv-upload"
+                  type="file" 
+                  accept=".csv" 
+                  onChange={handleFileUpload} 
+                  className="hidden" 
+                />
+                <span className="text-xs font-medium text-slate-400 tracking-wider"></span>
               </div>
+
+              {/* Indikator Merah (Start/Stop) */}
+              <div className="flex items-center gap-1">
+                <button 
+                  onClick={() => setIsRunning(!isRunning)}
+                  disabled={csvData.length === 0}
+                  className={`w-6 h-6 rounded-full transition-all active:scale-90 
+                    ${csvData.length === 0 
+                      ? 'bg-slate-400 cursor-not-allowed opacity-50' 
+                      : isRunning 
+                        ? 'bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.8)] animate-pulse' 
+                        : 'bg-rose-900 hover:bg-rose-700 shadow-[0_0_5px_rgba(244,63,94,0.2)]' 
+                    }`}
+                  title=""
+                ></button>
+                <span className="text-xs font-medium text-slate-400 tracking-wider"></span>
+              </div>
+
+            </div>
+          </div>
+        </header>
+
+        {/* Status Panel */}
+        <div className={`relative overflow-hidden p-6 md:p-8 rounded-2xl border transition-all duration-700 flex flex-col items-center justify-center min-h-160px
+          ${status.kode === 1 
+            ? (isDarkMode ? 'bg-rose-950/20 border-rose-500/50 shadow-[0_0_30px_rgba(244,63,94,0.15)]' : 'bg-rose-50 border-rose-400 shadow-[0_0_30px_rgba(244,63,94,0.15)]') 
+            : (isDarkMode ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-emerald-50 border-emerald-300 shadow-sm')
+          }`}>
+          {status.kode === 1 && <div className="absolute inset-0 bg-rose-500/5 animate-pulse rounded-2xl" />}
+          <p className={`text-xs md:text-sm font-semibold tracking-[0.2em] mb-2 ${status.kode === 1 ? (isDarkMode ? 'text-rose-400' : 'text-rose-600') : (isDarkMode ? 'text-emerald-400' : 'text-emerald-600')}`}>
+            STATUS OPERASIONAL
+          </p>
+          <h2 className={`text-3xl md:text-5xl font-bold tracking-tight text-center ${status.kode === 1 ? 'text-rose-500' : 'text-emerald-500'}`}>
+            {status.pesan}
+          </h2>
+        </div>
+
+        {/* Sensor Grid */}
+        {sensor && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+            {Object.entries(sensor).map(([key, val]) => (
+              <SensorCard 
+                key={key} 
+                label={formatLabel(key)} 
+                value={formatSensorValue(key, val as number)}
+                isDarkMode={isDarkMode}
+              />
             ))}
           </div>
         )}
